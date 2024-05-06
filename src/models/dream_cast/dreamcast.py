@@ -11,7 +11,10 @@ class DreamCast(nn.module):
         self,
         config,
         latent_height: int = 5,
-        latent_width: int = 10,):
+        latent_width: int = 10,
+        seq_length: int = 4,
+        task: str = 'forecasting',
+        ):
         super(DreamCast, self).__init__()
         
         #VAE Model configurations
@@ -19,7 +22,7 @@ class DreamCast(nn.module):
         #Earthfromer Model configurations
         earthformer_cfg = OmegaConf.to_object(config.earthformer_model)
         
-        #Latent Dimension
+        self.seq_length = seq_length
         self.latent_channels = vae_cfg['latent_channels']
         
         #initialize encoder
@@ -64,6 +67,26 @@ class DreamCast(nn.module):
     def decode(self, h_combined: torch.FloatTensor) -> torch.FloatTensor:
         x_recon = self.decoder(h_combined)
         return x_recon
+    
+    def compute_hidden_observe(self, ):
+        return
+    
+    def rollout_observation(self, obs_encoded: torch.Tensor, prev_hidden_state):
+        priors = []
+        posteriors = []
+        for t in range(self.seq_length):
+            prior_hidden, posterior_hidden = self.compute_hidden_observe(obs_encoded[t], prev_hidden_state)
+            priors.append(prior_hidden)
+            posteriors.append(posterior_hidden)
+            prev_hidden_state = posterior_hidden
+        return priors, posteriors
+            
+            
+        
+        
+        
+        
+        
     
     
         
