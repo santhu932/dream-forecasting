@@ -26,7 +26,7 @@ class LSSMUtils(object):
         else:
             raise NotImplementedError
 
-    def rssm_seq_to_batch(self, rssm_state, batch_size, seq_len):
+    def lssm_seq_to_batch(self, rssm_state, batch_size, seq_len):
         # if self.rssm_type == 'discrete':
         #     return RSSMDiscState(
         #         seq_to_batch(rssm_state.logit[:seq_len], batch_size, seq_len),
@@ -41,7 +41,7 @@ class LSSMUtils(object):
                 seq_to_batch(rssm_state.deter[:seq_len], batch_size, seq_len)
             )
         
-    def rssm_batch_to_seq(self, rssm_state, batch_size, seq_len):
+    def lssm_batch_to_seq(self, rssm_state, batch_size, seq_len):
         # if self.rssm_type == 'discrete':
         #     return RSSMDiscState(
         #         batch_to_seq(rssm_state.logit, batch_size, seq_len),
@@ -80,7 +80,7 @@ class LSSMUtils(object):
             std = F.softplus(std) + self.min_std
             return mean + std*torch.randn_like(mean), std
 
-    def rssm_stack_states(self, rssm_states, dim):
+    def lssm_stack_states(self, rssm_states, dim):
         # if self.rssm_type == 'discrete':
         #     return RSSMDiscState(
         #         torch.stack([state.logit for state in rssm_states], dim=dim),
@@ -101,7 +101,7 @@ class LSSMUtils(object):
         if self.lssm_type == 'continuous':
             return torch.cat((rssm_state.deter, rssm_state.stoch), dim=-1)
 
-    def rssm_detach(self, rssm_state):
+    def lssm_detach(self, rssm_state):
         # if self.rssm_type == 'discrete':
         #     return RSSMDiscState(
         #         rssm_state.logit.detach(),  
@@ -116,7 +116,7 @@ class LSSMUtils(object):
                 rssm_state.deter.detach()
             )
 
-    def _init_rssm_state(self, batch_size, **kwargs):
+    def _init_lssm_state(self, batch_size, **kwargs):
         # if self.rssm_type  == 'discrete':
         #     return RSSMDiscState(
         #         torch.zeros(batch_size, self.stoch_size, **kwargs).to(self.device),
