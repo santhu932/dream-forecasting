@@ -64,8 +64,8 @@ class Encoder(nn.Module):
         self.conv_norm_out = nn.GroupNorm(num_channels=block_out_channels[-1], num_groups=norm_num_groups, eps=1e-6)
         self.conv_act = nn.SiLU()
 
-        conv_out_channels = 2 * out_channels if double_z else out_channels
-        self.conv_out = nn.Conv2d(block_out_channels[-1], conv_out_channels, 3, padding=1)
+        #conv_out_channels = 2 * out_channels if double_z else out_channels
+        self.conv_out = nn.Conv2d(block_out_channels[-1], out_channels, 3, padding=1)
 
     def forward(self, x):
         sample = x
