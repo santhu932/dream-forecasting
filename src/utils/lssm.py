@@ -62,7 +62,7 @@ class LSSMUtils(object):
         #     logit = torch.reshape(rssm_state.logit, shape = (*shape[:-1], self.category_size, self.class_size))
         #     return td.Independent(td.OneHotCategoricalStraightThrough(logits=logit), 1)
         if self.lssm_type == 'continuous':
-            return td.independent.Independent(td.Normal(rssm_state.mean, rssm_state.std), 1)
+            return td.independent.Independent(td.Normal(rssm_state.mean, rssm_state.std), reinterpreted_batch_ndims=4)
 
     def get_stoch_state(self, stats):
         # if self.rssm_type == 'discrete':

@@ -27,8 +27,6 @@ class DreamCast(nn.module, LSSMUtils):
         #VAE Model configurations
         vae_cfg = OmegaConf.to_object(config.vae_model)
         
-        #Earthfromer Model configurations
-        earthformer_cfg = OmegaConf.to_object(config.earthformer_model)
         
         self.latent_deter_channels = latent_deter_channels
         self.latent_height = data_cfg['img_height'] / ( 2 ** (len(vae_cfg['down_block_types']) - 1))

@@ -1,4 +1,7 @@
-name: 'dream-cast-net'
+name: 'dream-cast-net-1.0'
+lssm_type: 'continuous'
+latent_deter_channels: 128
+mode: 'training'
 dataset:
   combine_data: false
   num_channels: 14
@@ -26,19 +29,46 @@ optim:
   # min_lr_ratio: 1.0e-3
   # warmup_min_lr_ratio: 0.1
 
-model:
-  down_block_types: ['DownEncoderBlock2D', 'DownEncoderBlock2D', 'DownEncoderBlock2D', 'DownEncoderBlock2D']
+loss:
+  recon_loss_type: "mse"
+  kl_balance: true
+  kl_balance_scale: 0.8
+  use_free_nats: false
+  free_nats: 0.0
+  kl_beta: 0.0001
+
+
+vae_model:
   in_channels: 14
-  block_out_channels: [128, 256, 512, 512]  # downsample `len(block_out_channels) - 1` times
-  act_fn: 'silu'
   latent_channels: 64
-  up_block_types: ['UpDecoderBlock2D', 'UpDecoderBlock2D', 'UpDecoderBlock2D', 'UpDecoderBlock2D']
-  norm_num_groups: 32
-  layers_per_block: 2
   out_channels: 14
-  loss:
-    disc_start: 8001
-    kl_weight: 1e-6
-    disc_weight: 0.5
-    perceptual_weight: 0.0  # ncep does not have RGB channels
-    disc_in_channels: 14
+  block_out_channels: [128, 256, 512, 512]
+  down_block_types: ['DownEncoderBlock2D', 'DownEncoderBlock2D', 'DownEncoderBlock2D', 'DownEncoderBlock2D']
+  layers_per_block: 2
+  act_fn: 'silu'
+  norm_num_groups: 32
+  up_block_types: ['UpDecoderBlock2D', 'UpDecoderBlock2D', 'UpDecoderBlock2D', 'UpDecoderBlock2D']
+
+earthformer_model:
+  enc_depth: [1, 1]
+  enc_cuboid_size: [[1, 4, 4], [1, 4, 4]]
+  dec_depth: [1, 1]
+  dec_self_cuboid_size: [[1, 4, 4], [1, 4, 4]]
+  enc_use_inter_ffn: true
+  dec_use_inter_ffn: true
+  encode_latent: false
+
+  attn_drop: 0.1
+  proj_drop: 0.1
+  ffn_drop: 0.1
+  num_heads: 4
+  num_global_vectors: 8
+  use_dec_cross_global: false
+
+ffn_module:
+  pre_norm: true
+  normalization: 'layer_norm'
+  layer_norm_eps: '1E-5'
+  activation: 'relu'
+  activation_dropout: 0.0
+  dropout: 0.1
