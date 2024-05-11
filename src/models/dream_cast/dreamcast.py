@@ -14,36 +14,43 @@ class DreamCast(nn.module, LSSMUtils):
         self,
         config,
         info,
-        latent_height: int = 5,
-        latent_width: int = 10,
+        latent_deter_channels: int = 128,
         lssm_type: str = 'continuous',
-        pre_norm: bool = True,
-        normalization: str = 'layer_norm',
-        layer_norm_eps: float = 1E-5,
-        activation: str='relu',
-        activation_dropout: float = 0.0,
-        dropout: float = 0.1,
         ):
         nn.Module.__init__(self)
         LSSMUtils.__init__(self, rssm_type=lssm_type, info=info)
         
+        
+        #Data configurations
+        data_cfg = OmegaConf.to_object(config.dataset)
+        
         #VAE Model configurations
         vae_cfg = OmegaConf.to_object(config.vae_model)
+        
         #Earthfromer Model configurations
         earthformer_cfg = OmegaConf.to_object(config.earthformer_model)
-
-        self.latent_channels = vae_cfg['latent_channels']
-        self._pre_norm = pre_norm
-        self.normalization = normalization
-        self.layer_norm_eps = layer_norm_eps
-        self.activation = activation
-        self.activation_dropout = activation_dropout
-        self.dropout = dropout
-        self.hidden_size = 4 * self.latent_channels
         
+        self.latent_deter_channels = latent_deter_channels
+        self.latent_height = data_cfg['img_height'] / ( 2 ** (len(vae_cfg['down_block_types']) - 1))
+        self.latent_width = data_cfg['img_width'] / ( 2 ** (len(vae_cfg['down_block_types']) - 1))
+        
+        
+        
+        #Feed-forward module parameters
+        ffn_cfg = OmegaConf.to_object(config.vae_model)
+        self.latent_stoch_channels = vae_cfg['latent_channels']
+        self._pre_norm = ffn_cfg['pre_norm']
+        self.normalization = ffn_cfg['normalization']
+        self.layer_norm_eps = ffn_cfg['layer_norm_eps']
+        self.activation = ffn_cfg['activation']
+        self.activation_dropout = ffn_cfg['activation_dropout']
+        self.dropout = ffn_cfg['dropout']
+        self.hidden_size = 4 * self.latent_deter_channels
+        
+
         self.fc_prior = self._compute_prior()
         self.fc_posterior = self._compute_posterior()
-        self.post_quant_conv = nn.Conv2d(2*self.latent_channels , 2*self.latent_channels , 1)
+        self.post_quant_conv = nn.Conv2d(self.latent_deter_channels + self.latent_stoch_channels , self.latent_deter_channels + self.latent_stoch_channels , 1)
         
         #initialize encoder
         self.encoder = Encoder(
@@ -58,7 +65,7 @@ class DreamCast(nn.module, LSSMUtils):
         
         #initialize decoder
         self.decoder = Decoder(
-            in_channels= 2 * vae_cfg['latent_channels'],
+            in_channels= self.latent_deter_channels + vae_cfg['latent_channels'],
             out_channels=vae_cfg['out_channels'],
             up_block_types=vae_cfg['up_block_types'],
             block_out_channels=vae_cfg['block_out_channels'],
@@ -68,34 +75,36 @@ class DreamCast(nn.module, LSSMUtils):
         
         #initialize earthformer
         self.earthformer = CuboidTransformerModel(
-            input_shape=(1, latent_height, latent_width, 2 * vae_cfg['latent_channels']),
-            target_shape=(1, latent_height, latent_width, vae_cfg['latent_channels']),
+            input_shape=(1, self.latent_height, self.latent_width, self.latent_deter_channels + vae_cfg['latent_channels']),
+            target_shape=(1, self.latent_height, self.latent_width, self.latent_deter_channels),
             **config.earthformer_model
         )
         
         
     def _compute_prior(self):
-        prior_module = [nn.Linear(in_features=self.latent_channels, out_features=self.hidden_size, bias=True)]
+        prior_module = []
         if self._pre_norm:
-            prior_module += [get_norm_layer(normalization=self.normalization, in_channels=self.latent_channels, epsilon=self.layer_norm_eps)]
+            prior_module += [get_norm_layer(normalization=self.normalization, in_channels=self.latent_deter_channels, epsilon=self.layer_norm_eps)]
+        prior_module += [nn.Linear(in_features=self.latent_deter_channels, out_features=self.hidden_size, bias=True)]
         prior_module += [get_activation(self.activation)]
         prior_module += [nn.Dropout(self.activation_dropout)]
-        prior_module += [nn.Linear(in_features=self.hidden_size, out_features=2*self.latent_channels, bias=True)]
+        prior_module += [nn.Linear(in_features=self.hidden_size, out_features=2*self.latent_stoch_channels, bias=True)]
         prior_module += [nn.Dropout(self.dropout)]
-        prior_module += [nn.Conv2d(2 * self.latent_channels , 2 * self.latent_channels , 1)]
+        prior_module += [nn.Conv2d(2 * self.latent_stoch_channels , 2 * self.latent_stoch_channels , 1)]
         return nn.Sequential(*prior_module)
     
     
     
     def _compute_posterior(self):
-        posterior_module = [nn.Linear(in_features=self.latent_channels, out_features=self.hidden_size, bias=True)]
+        posterior_module = []
         if self._pre_norm:
-            posterior_module += [get_norm_layer(normalization=self.normalization, in_channels=self.latent_channels, epsilon=self.layer_norm_eps)]
+            posterior_module += [get_norm_layer(normalization=self.normalization, in_channels=self.latent_deter_channels + self.latent_stoch_channels, epsilon=self.layer_norm_eps)]
+        posterior_module += [nn.Linear(in_features=self.latent_deter_channels + self.latent_stoch_channels, out_features=self.hidden_size, bias=True)]
         posterior_module += [get_activation(self.activation)]
         posterior_module += [nn.Dropout(self.activation_dropout)]
-        posterior_module += [nn.Linear(in_features=self.hidden_size, out_features=2*self.latent_channels, bias=True)]
+        posterior_module += [nn.Linear(in_features=self.hidden_size, out_features=2*self.latent_stoch_channels, bias=True)]
         posterior_module += [nn.Dropout(self.dropout)]
-        posterior_module += [nn.Conv2d(2 * self.latent_channels , 2 * self.latent_channels , 1)]
+        posterior_module += [nn.Conv2d(2 * self.latent_stoch_channels , 2 * self.latent_stoch_channels , 1)]
         return nn.Sequential(*posterior_module)
         
         
